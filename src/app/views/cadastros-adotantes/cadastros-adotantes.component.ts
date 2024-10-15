@@ -1,105 +1,107 @@
-import { Component, OnInit } from '@angular/core';
-import { AbstractControl, FormControl, FormGroup, ValidationErrors, Validators } from '@angular/forms';
-import { Adotante } from 'src/app/models/adotante';
+import { Component, Inject, OnInit, Optional, ViewChild } from '@angular/core';
+import { FormControl, FormGroup, Validators } from '@angular/forms';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { AdotanteService } from 'src/app/services/adotante.service';
-
-// Função validadora para o CPF
-function cpfLengthValidator(control: AbstractControl): ValidationErrors | null {
-  // Obtendo o valor do controle
-  const value = control.value;
-  // Verificando se o CPF tem exatamente 11 caracteres
-  if (value && value.length !== 11) {
-    // Se não tiver, retorna um erro
-    return { cpfLength: true };
-  }
-  // Se tiver, retorna null (sem erros)
-  return null;
-}
+import { MatDialogRef, MAT_DIALOG_DATA } from '@angular/material/dialog';
+import { Router } from '@angular/router';
+import { Adotante } from 'src/app/models/adotante';
+import { NotificationComponent } from 'src/app/notification/notification.component';
 
 @Component({
   selector: 'app-cadastros-adotantes',
   templateUrl: './cadastros-adotantes.component.html',
   styleUrls: ['./cadastros-adotantes.component.scss']
 })
-
 export class CadastrosAdotantesComponent implements OnInit {
-  // Definição do formulário
+  @ViewChild(NotificationComponent) notification!: NotificationComponent;
+
   profileForm = new FormGroup({
-    // Campo nome com validação de requerido e mínimo de 8 caracteres
-    nome: new FormControl(''),
-    // Campo matrícula sem validação
+    nome: new FormControl('', [Validators.required]),
     matricula: new FormControl(''),
-    // Campo CPF com validação de requerido e validação de comprimento
-    cpf: new FormControl(''),
-    // Campo email com validação de requerido e formato de email
+    cpf: new FormControl('', [Validators.required]),
     email: new FormControl(''),
-    
     telefone: new FormControl(''),
-    
     estadoCivil: new FormControl(''),
-    
     logradouro: new FormControl(''),
-    
     cep: new FormControl(''),
-    
     numero: new FormControl(''),
-    
     bairro: new FormControl(''),
-    
     cidade: new FormControl(''),
-    
     estado: new FormControl(''),
-  
     complemento: new FormControl('')
   });
 
-  // Fonte de dados para a tabela
-  dataSource: Adotante[] = [];
-
-  // Injetando MatSnackBar e AdotanteService no construtor
-  constructor(private snackBar: MatSnackBar, private adotanteService: AdotanteService) { }
-
-  // Método chamado quando o componente é inicializado
-  ngOnInit(): void {
-    // Inicializa a fonte de dados da tabela com os adotantes do serviço
-    this.adotanteService.getAdotantes().subscribe(adotantes => {
-      this.dataSource = adotantes;
-    });
+  constructor(
+    private snackBar: MatSnackBar,
+    private adotanteService: AdotanteService,
+    private router: Router,
+    @Optional() private dialogRef: MatDialogRef<CadastrosAdotantesComponent>,
+    @Optional() @Inject(MAT_DIALOG_DATA) public data: Adotante
+  ) {
+    if (data) {
+      this.profileForm.patchValue(data);
+    }
   }
 
-  // Método chamado quando o formulário é submetido
+  ngOnInit(): void {
+    if (!this.data) {
+      // Lógica para lidar com a inicialização do componente quando não usado como uma caixa de diálogo
+    }
+  }
+
   onSubmit() {
-    // Acessando o valor do formulário
-    const formValues = this.profileForm.value;
+    if (this.profileForm.valid) {
+      const formValues = this.profileForm.value;
 
-    // Criando um novo adotante com os valores do formulário
-    const newAdotante: Adotante = {
-      matricula:'', // 
-      nome: formValues.nome ?? '', 
-      cpf: formValues.cpf ?? '', 
-      email: formValues.email?? '', 
-      telefone: formValues.telefone ?? '', 
-      estadoCivil: formValues.estadoCivil ?? '', 
-      logradouro: formValues.logradouro ?? '', 
-      cep: formValues.cep ?? '',
-      numero: formValues.numero ?? '',
-      bairro: formValues.bairro ?? '',
-      cidade: formValues.cidade ?? '', 
-      estado: formValues.estado ?? '', 
-      complemento: formValues.complemento ?? '' 
-    };
+      const newAdotante: Adotante = {
+        matricula: formValues.matricula || '',
+        nome: formValues.nome || '',
+        cpf: formValues.cpf || '',
+        email: formValues.email || '',
+        telefone: formValues.telefone || '',
+        estadoCivil: formValues.estadoCivil || '',
+        logradouro: formValues.logradouro || '',
+        cep: formValues.cep || '',
+        numero: formValues.numero || '',
+        bairro: formValues.bairro || '',
+        cidade: formValues.cidade || '',
+        estado: formValues.estado || '',
+        complemento: formValues.complemento || ''
+      };
 
-    // Adicionando o novo adotante ao serviço
-    this.adotanteService.addAdotante(newAdotante).subscribe(() => {
-      // Exibindo a mensagem de sucesso
-      this.snackBar.open('Adotante cadastrado com sucesso!', 'Fechar', {
-        duration: 5000, // A mensagem será exibida por 5 segundos
-        verticalPosition: 'top', // A mensagem será exibida no topo da tela
+      this.adotanteService.addAdotante(newAdotante).subscribe(() => {
+        this.notification.showMessage('Dados cadastrados com sucesso!<br> Agora escolha seu pet!');
+
+        this.profileForm.reset();
+
+        this.adotanteService.getAdotantes().subscribe(adotantes => {
+          // Manipule os dados se necessário
+        });
+
+        // Redireciona para a página de adoção de animais após 6 segundos
+        setTimeout(() => {
+          this.router.navigate(['/adocao-animais']);
+        }, 5000);
+
+        if (this.dialogRef) {
+          this.dialogRef.close(newAdotante);
+        }
       });
+    } else {
+      this.snackBar.open('Por favor, preencha os campos corretamente.', 'Fechar', {
+        duration: 5000,
+        verticalPosition: 'top'
+      });
+    }
+  }
 
-      // Resetando o formulário
-      this.profileForm.reset();
-    });
+  onCancel() {
+    // Redireciona para a página de menu
+    this.router.navigate(['/menu']);
+
+    // Fecha a caixa de diálogo se estiver aberta
+    if (this.dialogRef) {
+      this.dialogRef.close();
+    }
   }
 }
